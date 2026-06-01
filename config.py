@@ -17,6 +17,7 @@ DB_NAME = "database.db"
 # BOT REKOMENDASI
 # Ganti sesuai bot lo mau rekomendasiin apa
 # ===========================
+CHANNEL_ID = "@Freelanceapkbot_Info"
 BOT_REKOMENDASI = [
     {"nama": "Bot Top Up Game", "link": "https://t.me/XyroStoreBot"}
 ]
