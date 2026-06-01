@@ -8,9 +8,9 @@ DANA_ADMIN = "085864539634"
 # ===========================
 # SETTING
 # ===========================
-KOMISI_REFERRAL = 3000
+KOMISI_REFERRAL = 1500
 KOMISI_PERAPPROVE = 1000
-MIN_WD = 2000
+MIN_WD = 10000
 DB_NAME = "database.db"
 
 # ===========================
