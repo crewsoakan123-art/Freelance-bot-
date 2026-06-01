@@ -1,84 +1,69 @@
-import sqlite3
-from config import DB_NAME
+from pymongo import MongoClient
+from config import MONGO_URL
 
-def init_db():
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS users (
-        user_id INTEGER PRIMARY KEY, username TEXT, full_name TEXT,
-        saldo INTEGER DEFAULT 0, referral_code TEXT, referred_by INTEGER,
-        join_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS tasks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, nama_apk TEXT, link_referral TEXT,
-        bayaran INTEGER, stok INTEGER DEFAULT -1, aktif INTEGER DEFAULT 1,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS user_tasks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, task_id INTEGER,
-        bukti_file_id TEXT, status TEXT DEFAULT 'pending',
-        submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, approved_at TIMESTAMP)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS withdrawals (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, jumlah INTEGER,
-        nomor_dana TEXT, status TEXT DEFAULT 'pending',
-        requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, processed_at TIMESTAMP)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS deposits (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, jumlah INTEGER,
-        bukti_file_id TEXT, status TEXT DEFAULT 'pending',
-        requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, approved_at TIMESTAMP)''')
-    conn.commit()
-    conn.close()
+client = MongoClient(MONGO_URL)
+db = client["bot_db"]
+
+users = db["users"]
+tasks = db["tasks"]
+user_tasks = db["user_tasks"]
+withdrawals = db["withdrawals"]
+deposits = db["deposits"]
 
 def get_user(user_id):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE user_id=?", (user_id,))
-    r = c.fetchone(); conn.close(); return r
+    return users.find_one({"user_id": user_id})
 
 def create_user(user_id, username, full_name, ref_code, referred_by=None):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute("INSERT OR IGNORE INTO users (user_id,username,full_name,referral_code,referred_by) VALUES (?,?,?,?,?)",
-              (user_id, username, full_name, ref_code, referred_by))
-    conn.commit(); conn.close()
+    if not get_user(user_id):
+        users.insert_one({
+            "user_id": user_id,
+            "username": username,
+            "full_name": full_name,
+            "saldo": 0,
+            "referral_code": ref_code,
+            "referred_by": referred_by
+        })
 
 def update_saldo(user_id, jumlah):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute("UPDATE users SET saldo=saldo+? WHERE user_id=?", (jumlah, user_id))
-    conn.commit(); conn.close()
+    users.update_one(
+        {"user_id": user_id},
+        {"$inc": {"saldo": jumlah}}
+    )
 
-def get_active_tasks():
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute("SELECT * FROM tasks WHERE aktif=1")
-    r = c.fetchall(); conn.close(); return r
-
-def get_task(task_id):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute("SELECT * FROM tasks WHERE id=?", (task_id,))
-    r = c.fetchone(); conn.close(); return r
+def get_saldo(user_id):
+    user = get_user(user_id)
+    return user["saldo"] if user else 0
 
 def add_task(nama, link, bayaran, stok=-1):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute("INSERT INTO tasks (nama_apk,link_referral,bayaran,stok) VALUES (?,?,?,?)", (nama,link,bayaran,stok))
-    conn.commit(); conn.close()
+    tasks.insert_one({
+        "nama_apk": nama,
+        "link_referral": link,
+        "bayaran": bayaran,
+        "stok": stok,
+        "aktif": 1
+    })
+
+def get_active_tasks():
+    return list(tasks.find({"aktif": 1}))
 
 def deactivate_task(task_id):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute("UPDATE tasks SET aktif=0 WHERE id=?", (task_id,))
-    conn.commit(); conn.close()
+    tasks.update_one({"_id": task_id}, {"$set": {"aktif": 0}})
 
-def submit_task(user_id, task_id, bukti):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute("INSERT INTO user_tasks (user_id,task_id,bukti_file_id) VALUES (?,?,?)", (user_id,task_id,bukti))
-    r = c.lastrowid; conn.commit(); conn.close(); return r
+def create_withdrawal(user_id, jumlah, nomor):
+    withdrawals.insert_one({
+        "user_id": user_id,
+        "jumlah": jumlah,
+        "nomor_dana": nomor,
+        "status": "pending"
+    })
 
-def user_already_did_task(user_id, task_id):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
+def create_deposit(user_id, jumlah, bukti):
+    deposits.insert_one({
+        "user_id": user_id,
+        "jumlah": jumlah,
+        "bukti_file_id": bukti,
+        "status": "pending"
+    })    c = conn.cursor()
     c.execute("SELECT id FROM user_tasks WHERE user_id=? AND task_id=? AND status!='rejected'", (user_id,task_id))
     r = c.fetchone(); conn.close(); return r is not None
 
