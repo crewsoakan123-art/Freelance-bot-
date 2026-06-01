@@ -12,6 +12,7 @@ KOMISI_REFERRAL = 1500
 KOMISI_PERAPPROVE = 1000
 MIN_WD = 10000
 DB_NAME = "database.db"
+MONGO_URL = "mongodb+srv://crewsoakan123_db_user:123456@cluster0.92gutnj.mongodb.net/bot_db"
 
 # ===========================
 # BOT REKOMENDASI
